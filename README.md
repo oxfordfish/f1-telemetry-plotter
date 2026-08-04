@@ -16,15 +16,15 @@ A Python tool that fetches high-frequency Formula 1 telemetry data using the `Fa
    ```bash
    git clone git@github.com:YOUR_USERNAME/f1-telemetry-plotter.git
    cd f1-telemetry-plotter
-   
+   ```
 2. **Set up virtual environment & install requirements:**
-
+   ```bash
     python -m venv venv
     source venv/bin/activate
     pip install -r requirements.txt
-    
+   ```
 3. **Run the plotter:**
-
+   ```bash
     python f1_plotter.py
-    
+   ```
 
