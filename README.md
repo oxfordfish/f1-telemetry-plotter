@@ -2,7 +2,7 @@
 
 A Python tool that fetches high-frequency Formula 1 telemetry data using the `FastF1` API to generate side-by-side driver comparisons and speed-profile circuit maps.
 
-![Telemetry Comparison](telemetry_comparison.jpg)
+![Telemetry Comparison](telemetry_comparison.png)
 ![Track Map](track_map.png)
 
 ## Features
