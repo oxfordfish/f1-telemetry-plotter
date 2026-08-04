@@ -1,100 +1,99 @@
-import os
+from pathlib import Path
 import fastf1
 from fastf1 import plotting
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 1. Setup FastF1 styling & local caching folder
+# Configure FastF1 styling & caching
 plotting.setup_mpl()
 
-cache_dir = 'cache'
-if not os.path.exists(cache_dir):
-    os.makedirs(cache_dir)
-fastf1.Cache.enable_cache(cache_dir)
+CACHE_DIR = Path("cache")
+CACHE_DIR.mkdir(exist_ok=True)
+fastf1.Cache.enable_cache(CACHE_DIR)
 
-print("Fetching session data from FastF1...")
-
-# 2. Load Session (e.g., 2023 Monaco GP Qualifying)
+# Session config
 YEAR = 2023
-GRAND_PRIX = 'Monaco'
-SESSION_TYPE = 'Q'
+GRAND_PRIX = "Monaco"
+SESSION_TYPE = "Q"
+DRIVER_1, DRIVER_2 = "VER", "LEC"
 
-session = fastf1.get_session(YEAR, GRAND_PRIX, SESSION_TYPE)
-session.load()
 
-# 3. Select Fastest Laps
-driver1 = 'VER'
-driver2 = 'LEC'
+def main():
+    print(f"Fetching {YEAR} {GRAND_PRIX} GP ({SESSION_TYPE}) data...")
+    session = fastf1.get_session(YEAR, GRAND_PRIX, SESSION_TYPE)
+    session.load()
 
-lap_1 = session.laps.pick_driver(driver1).pick_fastest()
-lap_2 = session.laps.pick_driver(driver2).pick_fastest()
+    # Get fastest laps and telemetry
+    lap_1 = session.laps.pick_driver(DRIVER_1).pick_fastest()
+    lap_2 = session.laps.pick_driver(DRIVER_2).pick_fastest()
 
-# Get Telemetry
-tel_1 = lap_1.get_telemetry()
-tel_2 = lap_2.get_telemetry()
+    tel_1 = lap_1.get_telemetry()
+    tel_2 = lap_2.get_telemetry()
 
-# Get Driver Colors
-color_1 = fastf1.plotting.get_driver_color(driver1, session=session)
-color_2 = fastf1.plotting.get_driver_color(driver2, session=session)
+    c1 = plotting.get_driver_color(DRIVER_1, session=session)
+    c2 = plotting.get_driver_color(DRIVER_2, session=session)
 
-# ---------------------------------------------------------
-# FIGURE 1: TELEMETRY TRACES
-# ---------------------------------------------------------
-fig, ax = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
-fig.suptitle(f"{YEAR} {GRAND_PRIX} GP ({SESSION_TYPE}) - {driver1} vs {driver2} Telemetry", fontsize=14, fontweight='bold')
+    # ------------------------------------
+    # Telemetry Traces
+    # ------------------------------------
+    channels = [
+        ("Speed", "Speed (km/h)"),
+        ("Throttle", "Throttle %"),
+        ("Brake", "Brake"),
+        ("nGear", "Gear"),
+    ]
 
-# Speed
-ax[0].plot(tel_1['Distance'], tel_1['Speed'], label=f"{driver1} ({lap_1['LapTime']})", color=color_1)
-ax[0].plot(tel_2['Distance'], tel_2['Speed'], label=f"{driver2} ({lap_2['LapTime']})", color=color_2)
-ax[0].set_ylabel('Speed (km/h)')
-ax[0].legend(loc='lower right')
-ax[0].grid(True, linestyle='--', alpha=0.5)
+    fig, axes = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
+    fig.suptitle(
+        f"{YEAR} {GRAND_PRIX} GP ({SESSION_TYPE}) — {DRIVER_1} vs {DRIVER_2}",
+        fontsize=14,
+        fontweight="bold",
+    )
 
-# Throttle
-ax[1].plot(tel_1['Distance'], tel_1['Throttle'], color=color_1)
-ax[1].plot(tel_2['Distance'], tel_2['Throttle'], color=color_2)
-ax[1].set_ylabel('Throttle %')
-ax[1].grid(True, linestyle='--', alpha=0.5)
+    for ax, (channel, label) in zip(axes, channels):
+        ax.plot(
+            tel_1["Distance"],
+            tel_1[channel],
+            color=c1,
+            label=f"{DRIVER_1} ({lap_1['LapTime']})",
+        )
+        ax.plot(
+            tel_2["Distance"],
+            tel_2[channel],
+            color=c2,
+            label=f"{DRIVER_2} ({lap_2['LapTime']})",
+        )
+        ax.set_ylabel(label)
+        ax.grid(True, linestyle="--", alpha=0.5)
 
-# Brake
-ax[2].plot(tel_1['Distance'], tel_1['Brake'], color=color_1)
-ax[2].plot(tel_2['Distance'], tel_2['Brake'], color=color_2)
-ax[2].set_ylabel('Brake')
-ax[2].grid(True, linestyle='--', alpha=0.5)
+    # Handle single legend on top plot to avoid redundancy
+    axes[0].legend(loc="lower right")
+    axes[-1].set_xlabel("Distance (m)")
 
-# Gear
-ax[3].plot(tel_1['Distance'], tel_1['nGear'], color=color_1)
-ax[3].plot(tel_2['Distance'], tel_2['nGear'], color=color_2)
-ax[3].set_ylabel('Gear')
-ax[3].set_xlabel('Distance (m)')
-ax[3].grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig("telemetry_comparison.png", dpi=300)
+    print("Exported telemetry_comparison.png")
 
-plt.tight_layout()
-plt.savefig('telemetry_comparison.png', dpi=300)
-print("Saved telemetry_comparison.png!")
+    # ------------------------------------
+    # Speed Map
+    # ------------------------------------
+    x, y, speed = tel_1["X"].to_numpy(), tel_1["Y"].to_numpy(), tel_1["Speed"].to_numpy()
 
-# ---------------------------------------------------------
-# FIGURE 2: SPEED-COLORED TRACK MAP
-# ---------------------------------------------------------
-x = tel_1['X'].to_numpy()
-y = tel_1['Y'].to_numpy()
-speed = tel_1['Speed'].to_numpy()
+    fig_map, ax_map = plt.subplots(figsize=(10, 8))
+    ax_map.axis("off")
 
-points = np.array([x, y]).T.reshape(-1, 1, 2)
-segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    sc = ax_map.scatter(x, y, c=speed, cmap="plasma", s=8)
+    cbar = fig_map.colorbar(sc, ax=ax_map, orientation="horizontal", pad=0.05)
+    cbar.set_label("Speed (km/h)", fontsize=11)
 
-fig_map, ax_map = plt.subplots(figsize=(10, 8))
-ax_map.axis('off')
+    ax_map.set_title(
+        f"{GRAND_PRIX} Circuit Speed Map — {DRIVER_1}", fontsize=14, fontweight="bold"
+    )
 
-# Scatter plot colored by speed for a clean track rendering
-lc = ax_map.scatter(x, y, c=speed, cmap='plasma', s=8)
-cbar = fig_map.colorbar(lc, ax=ax_map, orientation='horizontal', pad=0.05)
-cbar.set_label('Speed (km/h)', fontsize=12)
+    plt.tight_layout()
+    plt.savefig("track_map.png", dpi=300)
+    print("Exported track_map.png")
 
-ax_map.set_title(f"{GRAND_PRIX} Circuit Map - {driver1} Speed Profile", fontsize=14, fontweight='bold')
-plt.tight_layout()
-plt.savefig('track_map.png', dpi=300)
-print("Saved track_map.png!")
 
-plt.show()
-
+if __name__ == "__main__":
+    main()
